@@ -1,0 +1,6 @@
+boto3
+botocore
+fastmcp
+opentelemetry-api
+opentelemetry-sdk
+openinference-instrumentation-mcp
