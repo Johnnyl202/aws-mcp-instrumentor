@@ -1,38 +1,28 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
-MCPInstrumentor().instrument()
+tracer_provider = TracerProvider()
+tracer_provider.add_span_processor(
+    BatchSpanProcessor(OTLPAwsSpanExporter(endpoint="https://xray.us-east-1.amazonaws.com/v1/traces"))
+)
+trace.set_tracer_provider(tracer_provider)
+MCPInstrumentor().instrument(tracer_provider=tracer_provider)
+
 import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
 from time import perf_counter as timer
 from typing import Dict, Optional
-
 import boto3
 from botocore.exceptions import ClientError
-
-
-
 from mcp.server.fastmcp import FastMCP
 
-
-#Optional to see span for testing
-#TESTING
-import sys
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-
-# Send spans to stderr instead of stdout (default)
-exporter = ConsoleSpanExporter(out=sys.stderr)
-
-trace.set_tracer_provider(TracerProvider())
-trace.get_tracer_provider().add_span_processor(
-    SimpleSpanProcessor(exporter)
-)
 
 # Initialize FastMCP server
 mcp = FastMCP("appsignals")

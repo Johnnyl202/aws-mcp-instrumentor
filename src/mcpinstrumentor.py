@@ -7,6 +7,24 @@ from opentelemetry.instrumentation.utils import unwrap
 from wrapt import ObjectProxy, register_post_import_hook, wrap_function_wrapper
 from openinference.instrumentation.mcp.package import _instruments
 
+from opentelemetry import trace as trace_api
+
+
+import logging
+
+# Add this at the top of your file, after the imports
+def setup_ctx_logger():
+    logger = logging.getLogger('ctx_logger')
+    logger.setLevel(logging.DEBUG)
+    handler = logging.FileHandler('ctx.log', mode='w')
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
+    return logger
+
+ctx_logger = setup_ctx_logger()
 class MCPInstrumentor(BaseInstrumentor):  
     """
     An instrumenter for MCP.
@@ -16,56 +34,10 @@ class MCPInstrumentor(BaseInstrumentor):
         return _instruments
 
     def _instrument(self, **kwargs: Any) -> None:
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.client.streamable_http",
-                "streamablehttp_client",
-                self._wrap_transport_with_callback,
-            ),
-            "mcp.client.streamable_http",
-        )
 
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.server.streamable_http",
-                "StreamableHTTPServerTransport.connect",
-                self._wrap_plain_transport,
-            ),
-            "mcp.server.streamable_http",
-        )
-
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.client.sse", "sse_client", self._wrap_plain_transport
-            ),
-            "mcp.client.sse",
-        )
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.server.sse", "SseServerTransport.connect_sse", self._wrap_plain_transport
-            ),
-            "mcp.server.sse",
-        )
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.client.stdio", "stdio_client", self._wrap_plain_transport
-            ),
-            "mcp.client.stdio",
-        )
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.server.stdio", "stdio_server", self._wrap_plain_transport
-            ),
-            "mcp.server.stdio",
-        )
-
-        register_post_import_hook(
-            lambda _: wrap_function_wrapper(
-                "mcp.server.session", "ServerSession.__init__", self._base_session_init_wrapper
-            ),
-            "mcp.server.session",
-        )
-
+        if kwargs.get("tracer_provider"):
+            tracer_provider = kwargs["tracer_provider"]
+        self.tracer_provider = tracer_provider
         register_post_import_hook(
             lambda _: wrap_function_wrapper(
                 "mcp.server.lowlevel.server",
@@ -77,7 +49,7 @@ class MCPInstrumentor(BaseInstrumentor):
 
     def _uninstrument(self, **kwargs: Any) -> None:
         unwrap("mcp.client.stdio", "stdio_client")
-        unwrap("mcp.server.stdio", "stdio_server")
+        unwrap("mcp.server.stdio", "satdio_server")
 
     def _toolcall_wrapper(self, wrapped, instance, args, kwargs):
         from opentelemetry import propagate
@@ -85,146 +57,49 @@ class MCPInstrumentor(BaseInstrumentor):
         def wrapper(func):
             async def instrumented_func(name, arguments=None):
                 from opentelemetry import trace, context
-                tracer = trace.get_tracer("mcp.server.lowlevel")
-                meta = None
-                if isinstance(arguments, dict):
-                    meta = arguments.get("_meta", {})
-                ctx = propagate.extract(meta)
-                with tracer.start_as_current_span(name="server.tool.call",kind=trace.SpanKind.SERVER, context=ctx ) as span:
-                    span.set_attribute("tool.name", name)
-                    span.set_attribute("server_side", True)
+                ctx_logger.info(f"Arguments: {arguments}")
+                tracer = self.tracer_provider.get_tracer("mcp.server")
+                if isinstance(arguments, dict) and arguments.get("_meta"):
+                    incomingtraceid = int(arguments.get("_meta").get("trace_id"))
+                    incomingspanid = int(arguments.get("_meta").get("span_id"))
+                ctx_logger.info(f"Trace ID: {format(incomingtraceid,"032x")}, Span ID: {format(incomingspanid,"016x")}")
+                span_context = trace.SpanContext(span_id=incomingspanid, trace_id=incomingtraceid, is_remote=False)
+                # contexttoattach = trace.set_span_in_context(trace.NonRecordingSpan(span_context))
+                # ctx_logger.info(f"Context to attach: {span_context}")
+                # with tracer.start_as_current_span(name="server.tool.call",kind=trace.SpanKind.SERVER) as span:
+                #     trace.set_span_in_context(trace.get_current_span(),contexttoattach)
+                #     span.set_attribute("tool.name", name)
+                #     span.set_attribute("server_side", True)
+                #     ctx_logger.info(f"Span context: {span}")
+                span_context = trace.SpanContext(
+                    trace_id=incomingtraceid,
+                    span_id=incomingspanid,
+                    is_remote=True,
+                )
+
+                # # Create a context that includes the non-recording parent span
+                parent_ctx = trace.set_span_in_context(trace.NonRecordingSpan(span_context))
+
+                # Attach the context and make sure to detach afterward
+                token = context.attach(parent_ctx)
+                try:
+                    with tracer.start_as_current_span(
+                        name="server.tool.call",
+                        kind=trace.SpanKind.SERVER,
+                        context=parent_ctx
+                    ) as span:
+                        span.set_attribute("tool.name", name)
+                        span.set_attribute("server_side", True)
+                        parent_id = getattr(span, '_parent', None)
+                        parent_span_id = parent_id.span_id if parent_id else incomingspanid
+                        ctx_logger.info(f"Span parent_id: {format(parent_span_id)}")
+                        ctx_logger.info(f"Span trace_id: {format(span.get_span_context().trace_id, '032x')}")
+                        ctx_logger.info(f"Span span_id: {format(span.get_span_context().span_id, '016x')}")
+                finally:
+                    context.detach(token)
+                ctx_logger.info(f"Spanaftertoken: {span}")
+                # self.tracer_provider.force_flush()
                 result = await func(name, arguments)
                 return result
             return original_decorator(instrumented_func)
         return wrapper
-
-    @asynccontextmanager
-    async def _wrap_transport_with_callback(
-        self, wrapped: Callable[..., Any], instance: Any, args: Any, kwargs: Any
-    ) -> AsyncGenerator[Tuple["InstrumentedStreamReader", "InstrumentedStreamWriter", Any], None]:
-        async with wrapped(*args, **kwargs) as (read_stream, write_stream, get_session_id_callback):
-            yield (
-                InstrumentedStreamReader(read_stream),
-                InstrumentedStreamWriter(write_stream),
-                get_session_id_callback,
-            )
-
-    @asynccontextmanager
-    async def _wrap_plain_transport(
-        self, wrapped: Callable[..., Any], instance: Any, args: Any, kwargs: Any
-    ) -> AsyncGenerator[Tuple["InstrumentedStreamReader", "InstrumentedStreamWriter"], None]:
-        async with wrapped(*args, **kwargs) as (read_stream, write_stream):
-            yield InstrumentedStreamReader(read_stream), InstrumentedStreamWriter(write_stream)
-
-    def _base_session_init_wrapper(
-        self, wrapped: Callable[..., None], instance: Any, args: Any, kwargs: Any
-    ) -> None:
-        wrapped(*args, **kwargs)
-        reader = getattr(instance, "_incoming_message_stream_reader", None)
-        writer = getattr(instance, "_incoming_message_stream_writer", None)
-        if reader and writer:
-            setattr(
-                instance, "_incoming_message_stream_reader", ContextAttachingStreamReader(reader)
-            )
-            setattr(instance, "_incoming_message_stream_writer", ContextSavingStreamWriter(writer))
-
-
-class InstrumentedStreamReader(ObjectProxy):  
-    # ObjectProxy missing context manager - https://github.com/GrahamDumpleton/wrapt/issues/73
-    async def __aenter__(self) -> Any:
-        return await self.__wrapped__.__aenter__()
-
-    async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> Any:
-        return await self.__wrapped__.__aexit__(exc_type, exc_value, traceback)
-
-    async def __aiter__(self) -> AsyncGenerator[Any, None]:
-        from mcp.shared.message import SessionMessage
-        from mcp.types import JSONRPCRequest
-        from opentelemetry import trace
-    
-        tracer = trace.get_tracer("mcp.server")
-        async for item in self.__wrapped__:
-            session_message = cast(SessionMessage, item)
-            request = session_message.message.root
-
-            if not isinstance(request, JSONRPCRequest):
-                yield item
-                continue
-
-            if request.params:
-                meta = request.params.get("_meta")
-                if meta:
-                    ctx = propagate.extract(meta)
-                    restore = context.attach(ctx)
-                    try:
-                        with tracer.start_as_current_span(f"server.{request.method}",kind=trace.SpanKind.SERVER) as span:
-                            span.set_attribute("mcp.server.session_id", session_message.session_id)
-                        yield item
-                        continue
-                    finally:
-                        context.detach(restore)
-            yield item
-            
-
-class InstrumentedStreamWriter(ObjectProxy):  
-    # ObjectProxy missing context manager - https://github.com/GrahamDumpleton/wrapt/issues/73
-    async def __aenter__(self) -> Any:
-        return await self.__wrapped__.__aenter__()
-
-    async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> Any:
-        return await self.__wrapped__.__aexit__(exc_type, exc_value, traceback)
-
-    async def send(self, item: Any) -> Any:
-        from mcp.shared.message import SessionMessage
-        from mcp.types import JSONRPCRequest
-
-        session_message = cast(SessionMessage, item)
-        request = session_message.message.root
-        if not isinstance(request, JSONRPCRequest):
-            return await self.__wrapped__.send(item)
-        meta = None
-        if not request.params:
-            request.params = {}
-        meta = request.params.setdefault("_meta", {})
-        if isinstance(request.params, dict):
-            arguments = request.params.setdefault("arguments", {})
-            if isinstance(arguments, dict):
-                meta = arguments.setdefault("_meta", {})
-                propagate.get_global_textmap().inject(meta)
-        return await self.__wrapped__.send(item)
-
-
-@dataclass(slots=True, frozen=True)
-class ItemWithContext:
-    item: Any
-    ctx: context.Context
-
-#internal components
-class ContextSavingStreamWriter(ObjectProxy):  # type: ignore
-    # ObjectProxy missing context manager - https://github.com/GrahamDumpleton/wrapt/issues/73
-    async def __aenter__(self) -> Any:
-        return await self.__wrapped__.__aenter__()
-
-    async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> Any:
-        return await self.__wrapped__.__aexit__(exc_type, exc_value, traceback)
-
-    async def send(self, item: Any) -> Any:
-        ctx = context.get_current()
-        return await self.__wrapped__.send(ItemWithContext(item, ctx))
-
-class ContextAttachingStreamReader(ObjectProxy):  # type: ignore
-    # ObjectProxy missing context manager - https://github.com/GrahamDumpleton/wrapt/issues/73
-    async def __aenter__(self) -> Any:
-        return await self.__wrapped__.__aenter__()
-
-    async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> Any:
-        return await self.__wrapped__.__aexit__(exc_type, exc_value, traceback)
-
-    async def __aiter__(self) -> AsyncGenerator[Any, None]:
-        async for item in self.__wrapped__:
-            item_with_context = cast(ItemWithContext, item)
-            restore = context.attach(item_with_context.ctx)
-            try:
-                yield item_with_context.item
-            finally:
-                context.detach(restore)

@@ -1,14 +1,26 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.mcpinstrumentor import MCPInstrumentor
-MCPInstrumentor().instrument()
+
+# Import all modules first
 import asyncio
-import os
 from contextlib import AsyncExitStack
 from opentelemetry import trace
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+from src.mcpinstrumentor import MCPInstrumentor
+
+# Set up OpenTelemetry tracing with AWS X-Ray exporter
+tracer_provider = TracerProvider(sampler=ALWAYS_ON)
+tracer_provider.add_span_processor(
+    BatchSpanProcessor(OTLPAwsSpanExporter(endpoint="https://xray.us-east-1.amazonaws.com/v1/traces"))
+)
+trace.set_tracer_provider(tracer_provider)
+
+# Instrument MCP with the same tracer provider
+MCPInstrumentor().instrument(tracer_provider=tracer_provider)
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import (
@@ -20,15 +32,12 @@ from mcp.types import (
     ListToolsResult,
     CallToolRequest
 )
+from opentelemetry.context import Context
+
 
 async def main():
-    # Set up OpenTelemetry tracer
-    console_exporter = ConsoleSpanExporter()
-    tracer_provider = trace_sdk.TracerProvider(sampler=trace_sdk.sampling.ALWAYS_ON)
-    tracer_provider.add_span_processor(SimpleSpanProcessor(console_exporter))
-    trace.set_tracer_provider(tracer_provider)
-    tracer = trace.get_tracer("testclient")
-
+    # OpenTelemetry tracer is already set up at the module level
+    tracer = trace.get_tracer("mcp.client")
     # Connect to the server and manage session
     async with AsyncExitStack() as exit_stack:
         server_params = StdioServerParameters(
@@ -42,10 +51,7 @@ async def main():
             }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
-
-        # Open a client span to cover the whole session
         with tracer.start_as_current_span("client.session", kind=trace.SpanKind.CLIENT) as span:
-            span.set_attribute("client_side", True)
             span.set_attribute("tool_name", "list_application_signals_services")
 
             session = await exit_stack.enter_async_context(ClientSession(reader, writer))
@@ -56,39 +62,40 @@ async def main():
                 )
             )
 
-            # List tools
-            tools_result = await session.send_request(
-                ClientRequest(
-                    root=ListToolsRequest(method="tools/list")
-                ),
-                ListToolsResult,
-            )
-            print("Tools available:", [tool.name for tool in tools_result.tools])
+            ctx = span.get_span_context()
 
-            # Call the tool while span is active
-            span.add_event("Sending tool call request")
             response = await session.send_request(
                 ClientRequest(
                     root=CallToolRequest(
                         method="tools/call",
                         params={
                             "name": "list_application_signals_services",
-                            "arguments": {}
+                            "arguments": {
+                                "_meta": {
+                                    "trace_id": ctx.trace_id,
+                                    "span_id": ctx.span_id,
+                                }
+                            }
                         }
                    )
                 ),
                 ClientResult,
             )
             span.add_event("Received tool call response")
-
-    # Print tool result
-    print("\nTool execution result:")
-    if hasattr(response.root, 'content') and response.root.content:
-        for item in response.root.content:
-            if item.get('type') == 'text':
-                print(item.get('text', ''))
-    else:
-        print("No content found in response")
-
+            print(f"Span type: {type(span).__name__}")
+            print(f"Span recording: {span.is_recording()}")
+            print(f"Span context: {span.get_span_context()}")
+        # Print tool result
+        print("\nTool execution result:")
+        if hasattr(response.root, 'content') and response.root.content:
+            for item in response.root.content:
+                if item.get('type') == 'text':
+                    print(item.get('text', ''))
+        else:
+            print("No content found in response")
+        
+        # Force flush to ensure all spans are exported
+        tracer_provider.force_flush()
+    
 if __name__ == "__main__":
     asyncio.run(main())
