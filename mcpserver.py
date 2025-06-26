@@ -4,13 +4,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
-tracer_provider = TracerProvider()
+
+# Set up OpenTelemetry tracing with AWS X-Ray exporter
+tracer_provider = TracerProvider(sampler=ALWAYS_ON)
+
+otlp_exporter = OTLPSpanExporter(
+    endpoint = "localhost:4317",
+    insecure = True,  # Set to True for local testing; use TLS in production
+)
+
 tracer_provider.add_span_processor(
-    BatchSpanProcessor(OTLPAwsSpanExporter(endpoint="https://xray.us-east-1.amazonaws.com/v1/traces"))
+    BatchSpanProcessor(otlp_exporter)
 )
 trace.set_tracer_provider(tracer_provider)
+
+
 MCPInstrumentor().instrument(tracer_provider=tracer_provider)
 
 import asyncio

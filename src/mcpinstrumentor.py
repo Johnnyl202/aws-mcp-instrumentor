@@ -86,7 +86,7 @@ class MCPInstrumentor(BaseInstrumentor):
                     with tracer.start_as_current_span(
                         name="server.tool.call",
                         kind=trace.SpanKind.SERVER,
-                        context=parent_ctx
+                        # context=parent_ctx
                     ) as span:
                         span.set_attribute("tool.name", name)
                         span.set_attribute("server_side", True)
@@ -98,7 +98,7 @@ class MCPInstrumentor(BaseInstrumentor):
                 finally:
                     context.detach(token)
                 ctx_logger.info(f"Spanaftertoken: {span}")
-                # self.tracer_provider.force_flush()
+                self.tracer_provider.force_flush()
                 result = await func(name, arguments)
                 return result
             return original_decorator(instrumented_func)

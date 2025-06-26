@@ -1,0 +1,23 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+
+processors:
+  batch:
+
+exporters:
+  debug:
+    verbosity: detailed
+  awsxray:
+    region: us-west-2  # Change to your desired AWS region
+    endpoint: "https://xray.us-west-2.amazonaws.com"  # Change to your desired endpoint
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, awsxray]
