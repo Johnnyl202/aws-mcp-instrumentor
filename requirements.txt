@@ -1,6 +1,7 @@
 boto3
 botocore
 fastmcp
+aws-opentelemetry-distro
 opentelemetry-api
 opentelemetry-sdk
 openinference-instrumentation-mcp

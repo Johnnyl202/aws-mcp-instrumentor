@@ -1,4 +1,0 @@
-2025-06-23 09:51:56,277 - Wrapping Server.call_tool: call_tool
-2025-06-23 09:51:56,422 - Server tool called: list_application_signals_services
-2025-06-23 09:51:56,423 - Arguments: {'_meta': {'traceparent': '00-8b5ee462b4c7d0813b86c1bdd90a485f-6391ade0aec29f60-01'}}
-2025-06-23 09:51:56,424 - Extracted context: {'current-span-4c2c8793-75e2-4f21-b9a4-3ba5b7582ee6': NonRecordingSpan(SpanContext(trace_id=0x8b5ee462b4c7d0813b86c1bdd90a485f, span_id=0x6391ade0aec29f60, trace_flags=0x01, trace_state=[], is_remote=True))}
