@@ -12,8 +12,8 @@ exporters:
   debug:
     verbosity: detailed
   awsxray:
-    region: us-west-2  # Change to your desired AWS region
-    endpoint: "https://xray.us-west-2.amazonaws.com"  # Change to your desired endpoint
+    region: us-east-1
+    endpoint: "https://xray.us-east-1.amazonaws.com"
 
 service:
   pipelines:

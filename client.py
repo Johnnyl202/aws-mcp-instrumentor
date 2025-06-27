@@ -9,10 +9,12 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
 
-# Set up OpenTelemetry tracing with AWS X-Ray exporter
+# Set up OpenTelemetry tracing with service name
+# resource = Resource.create({"service.name": "mcp-client"})
 tracer_provider = TracerProvider(sampler=ALWAYS_ON)
 
 otlp_exporter = OTLPSpanExporter(
@@ -26,7 +28,7 @@ tracer_provider.add_span_processor(
 trace.set_tracer_provider(tracer_provider)
 
 # Instrument MCP with the same tracer provider
-MCPInstrumentor().instrument(tracer_provider=tracer_provider)
+# MCPInstrumentor().instrument(tracer_provider=tracer_provider)
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import (
@@ -50,15 +52,17 @@ async def main():
             command="python",
             args=["mcpserver.py"],
             env={
-                **os.environ,
-                "MCP_TRANSPORT": "stdio",
-                "OTEL_TRACES_EXPORTER": "console",
-                "OTEL_LOG_LEVEL": "debug"
+                # **os.environ,
+                # "MCP_TRANSPORT": "stdio",
+                # "OTEL_TRACES_EXPORTER": "console",
+                # "OTEL_LOG_LEVEL": "debug",
+                "OTEL_SERVICE_NAME": "mcp-server",
             }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
         with tracer.start_as_current_span("client.session", kind=trace.SpanKind.CLIENT) as span:
             span.set_attribute("tool_name", "list_application_signals_services")
+            span.set_attribute("aws.span.kind", "CLIENT")
 
             session = await exit_stack.enter_async_context(ClientSession(reader, writer))
 
@@ -90,6 +94,7 @@ async def main():
             span.add_event("Received tool call response")
             print(f"Span type: {type(span).__name__}")
             print(f"Span recording: {span.is_recording()}")
+            print(f"Span kind: {span.kind}")
             print(f"Span context: {span.get_span_context()}")
         # Print tool result
         print("\nTool execution result:")

@@ -5,10 +5,10 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
 
-# Set up OpenTelemetry tracing with AWS X-Ray exporter
 tracer_provider = TracerProvider(sampler=ALWAYS_ON)
 
 otlp_exporter = OTLPSpanExporter(
@@ -20,8 +20,6 @@ tracer_provider.add_span_processor(
     BatchSpanProcessor(otlp_exporter)
 )
 trace.set_tracer_provider(tracer_provider)
-
-
 MCPInstrumentor().instrument(tracer_provider=tracer_provider)
 
 import asyncio

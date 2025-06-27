@@ -1,6 +1,6 @@
-2025-06-25 16:31:00,086 - INFO - Arguments: {'_meta': {'trace_id': 289822017424837825436284711625117745484, 'span_id': 5997239912319150310}}
-2025-06-25 16:31:00,087 - INFO - Trace ID: da09b0b04cbf9ce4ed10c5e45b81414c, Span ID: 533a79ecee93e8e6
-2025-06-25 16:31:00,087 - INFO - Span parent_id: 5997239912319150310
-2025-06-25 16:31:00,088 - INFO - Span trace_id: da09b0b04cbf9ce4ed10c5e45b81414c
-2025-06-25 16:31:00,088 - INFO - Span span_id: c3ddd6622997d6a5
-2025-06-25 16:31:00,089 - INFO - Spanaftertoken: NonRecordingSpan(SpanContext(trace_id=0xda09b0b04cbf9ce4ed10c5e45b81414c, span_id=0xc3ddd6622997d6a5, trace_flags=0x00, trace_state=[], is_remote=False))
+2025-06-27 11:24:23,396 - INFO - Arguments: {'_meta': {'trace_id': 320038719481574456508742662453658675366, 'span_id': 7036868829766911300}}
+2025-06-27 11:24:23,397 - INFO - Trace ID: f0c5371f4bcf59be7189882a77c868a6, Span ID: 61a7faeaf1468544
+2025-06-27 11:24:23,397 - INFO - Span parent_id: 7036868829766911300
+2025-06-27 11:24:23,398 - INFO - Span trace_id: f0c5371f4bcf59be7189882a77c868a6
+2025-06-27 11:24:23,398 - INFO - Span span_id: d06c3d26812ad42f
+2025-06-27 11:24:23,399 - INFO - Spanaftertoken: _Span(name="server.tool.call", context=SpanContext(trace_id=0xf0c5371f4bcf59be7189882a77c868a6, span_id=0xd06c3d26812ad42f, trace_flags=0x01, trace_state=[], is_remote=False))

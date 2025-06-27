@@ -7,7 +7,7 @@ from opentelemetry.instrumentation.utils import unwrap
 from wrapt import ObjectProxy, register_post_import_hook, wrap_function_wrapper
 from openinference.instrumentation.mcp.package import _instruments
 
-from opentelemetry import trace as trace_api
+from opentelemetry import trace 
 
 
 import logging
@@ -46,6 +46,14 @@ class MCPInstrumentor(BaseInstrumentor):
             ),
             "mcp.server.lowlevel.server",
         )
+        # register_post_import_hook(
+        #     lambda _: wrap_function_wrapper(
+        #         "mcp.client.basesession",
+        #         "BaseSession.send_request",
+        #         self._send_request_wrapper,
+        #     ),
+        #     "mcp.client.basesession",
+        # )
 
     def _uninstrument(self, **kwargs: Any) -> None:
         unwrap("mcp.client.stdio", "stdio_client")
@@ -58,7 +66,7 @@ class MCPInstrumentor(BaseInstrumentor):
             async def instrumented_func(name, arguments=None):
                 from opentelemetry import trace, context
                 ctx_logger.info(f"Arguments: {arguments}")
-                tracer = self.tracer_provider.get_tracer("mcp.server")
+                tracer = trace.get_tracer("mcp.server")
                 if isinstance(arguments, dict) and arguments.get("_meta"):
                     incomingtraceid = int(arguments.get("_meta").get("trace_id"))
                     incomingspanid = int(arguments.get("_meta").get("span_id"))
@@ -81,25 +89,66 @@ class MCPInstrumentor(BaseInstrumentor):
                 parent_ctx = trace.set_span_in_context(trace.NonRecordingSpan(span_context))
 
                 # Attach the context and make sure to detach afterward
-                token = context.attach(parent_ctx)
-                try:
-                    with tracer.start_as_current_span(
-                        name="server.tool.call",
-                        kind=trace.SpanKind.SERVER,
-                        # context=parent_ctx
-                    ) as span:
-                        span.set_attribute("tool.name", name)
-                        span.set_attribute("server_side", True)
-                        parent_id = getattr(span, '_parent', None)
-                        parent_span_id = parent_id.span_id if parent_id else incomingspanid
-                        ctx_logger.info(f"Span parent_id: {format(parent_span_id)}")
-                        ctx_logger.info(f"Span trace_id: {format(span.get_span_context().trace_id, '032x')}")
-                        ctx_logger.info(f"Span span_id: {format(span.get_span_context().span_id, '016x')}")
-                finally:
-                    context.detach(token)
+                with tracer.start_as_current_span(
+                    name="server.tool.call",
+                    kind=trace.SpanKind.SERVER,
+                    context=parent_ctx
+                ) as span:
+                    span.set_attribute("tool.name", name)
+                    span.set_attribute("server_side", True)
+                    span.set_attribute("aws.span.kind", "SERVER")
+                    parent_id = getattr(span, '_parent', None)
+                    parent_span_id = parent_id.span_id if parent_id else incomingspanid
+                    ctx_logger.info(f"Span parent_id: {format(parent_span_id)}")
+                    ctx_logger.info(f"Span trace_id: {format(span.get_span_context().trace_id, '032x')}")
+                    ctx_logger.info(f"Span span_id: {format(span.get_span_context().span_id, '016x')}")
                 ctx_logger.info(f"Spanaftertoken: {span}")
                 self.tracer_provider.force_flush()
                 result = await func(name, arguments)
                 return result
             return original_decorator(instrumented_func)
         return wrapper
+    
+    def _send_request_wrapper(self, wrapped, instance, args, kwargs):
+        async def wrapped_send_request(request, result_type, *a, **k):
+            from opentelemetry import trace
+
+            tracer = trace.get_tracer("mcp.client")
+            name = "unknown_tool"
+            arguments = {}
+
+            # Try to extract tool name and arguments from CallToolRequest
+            try:
+                if hasattr(request, "root") and hasattr(request.root, "params"):
+                    params = request.root.params
+                    if isinstance(params, dict):
+                        name = params.get("name", name)
+                        arguments = params.get("arguments", {})
+                    else:
+                        name = getattr(params, "name", name)
+                        arguments = getattr(params, "arguments", {})
+            except Exception as e:
+                ctx_logger.warning(f"Failed to extract tool info from request: {e}")
+
+            # Start CLIENT span
+            with tracer.start_as_current_span(name="client.tool.call", kind=trace.SpanKind.CLIENT) as span:
+                span.set_attribute("tool.name", name)
+                span.set_attribute("aws.span.kind", "CLIENT")
+
+                # Inject trace context into _meta
+                ctx = span.get_span_context()
+                if isinstance(arguments, dict):
+                    arguments["_meta"] = {
+                        "trace_id": ctx.trace_id,
+                        "span_id": ctx.span_id,
+                    }
+                    if hasattr(request.root, "params"):
+                        request.root.params.arguments = arguments
+
+                # Call original send_request
+                response = await wrapped(request, result_type, *a, **k)
+
+                span.add_event("client.tool.response.received")
+                return response
+
+        return wrapped_send_request
