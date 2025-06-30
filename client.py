@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import all modules first
 import asyncio
+import logging
 from contextlib import AsyncExitStack
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -11,7 +12,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcess
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from src.mcpinstrumentor import MCPInstrumentor
+
+# Set up logging first so we can debug the instrumentation
+from src.mcpinstrumentor import setup_ctx_logger
+ctx_logger = setup_ctx_logger()
 
 # Set up OpenTelemetry tracing with service name
 # resource = Resource.create({"service.name": "mcp-client"})
@@ -26,10 +30,14 @@ tracer_provider.add_span_processor(
     BatchSpanProcessor(otlp_exporter)
 )
 trace.set_tracer_provider(tracer_provider)
+from src.mcpinstrumentor import MCPInstrumentor
+instrumentor = MCPInstrumentor()
+instrumentor.instrument(tracer_provider=tracer_provider)
 
-# Instrument MCP with the same tracer provider
-# MCPInstrumentor().instrument(tracer_provider=tracer_provider)
-from mcp import ClientSession, StdioServerParameters
+from mcp import StdioServerParameters
+from mcp.client.session import ClientSession
+
+
 from mcp.client.stdio import stdio_client
 from mcp.types import (
     ClientRequest,
@@ -56,52 +64,28 @@ async def main():
                 # "MCP_TRANSPORT": "stdio",
                 # "OTEL_TRACES_EXPORTER": "console",
                 # "OTEL_LOG_LEVEL": "debug",
-                "OTEL_SERVICE_NAME": "mcp-server",
+                # "OTEL_SERVICE_NAME": "mcp-server",
             }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
-        with tracer.start_as_current_span("client.session", kind=trace.SpanKind.CLIENT) as span:
-            span.set_attribute("tool_name", "list_application_signals_services")
-            span.set_attribute("aws.span.kind", "CLIENT")
-
-            session = await exit_stack.enter_async_context(ClientSession(reader, writer))
-
-            await session.send_notification(
-                ClientNotification(
-                    InitializedNotification(method="notifications/initialized")
-                )
+        session = await exit_stack.enter_async_context(ClientSession(reader, writer))
+        await session.send_notification(
+            ClientNotification(
+                InitializedNotification(method="notifications/initialized")
             )
-
-            ctx = span.get_span_context()
-
-            response = await session.send_request(
-                ClientRequest(
-                    root=CallToolRequest(
-                        method="tools/call",
-                        params={
-                            "name": "list_application_signals_services",
-                            "arguments": {
-                                "_meta": {
-                                    "trace_id": ctx.trace_id,
-                                    "span_id": ctx.span_id,
-                                }
-                            }
-                        }
-                   )
-                ),
-                ClientResult,
-            )
-            span.add_event("Received tool call response")
-            print(f"Span type: {type(span).__name__}")
-            print(f"Span recording: {span.is_recording()}")
-            print(f"Span kind: {span.kind}")
-            print(f"Span context: {span.get_span_context()}")
+        )
+        response = await session.call_tool(
+            name="list_application_signals_services",
+            arguments={}
+        )
+        ctx_logger.info(f"Response: {response}")
         # Print tool result
         print("\nTool execution result:")
-        if hasattr(response.root, 'content') and response.root.content:
-            for item in response.root.content:
-                if item.get('type') == 'text':
-                    print(item.get('text', ''))
+        if hasattr(response, 'content') and response.content:
+            for item in response.content:
+                if hasattr(item, 'type') and item.type == 'text':
+                    if hasattr(item, 'text'):
+                        print(item.text)
         else:
             print("No content found in response")
         
