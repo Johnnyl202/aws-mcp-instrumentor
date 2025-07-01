@@ -73,7 +73,7 @@ class MCPInstrumentor(BaseInstrumentor):
         unwrap("mcp.server.stdio", "satdio_server")
     
     async def _client_call_tool_wrapper(self, wrapped, instance, args, kwargs):
-        tracer = trace.get_tracer("mcp.client")
+        tracer = self.tracer_provider.get_tracer("mcp.client")
         if len(args) > 0:
             name = args[0]
         else:
@@ -85,41 +85,35 @@ class MCPInstrumentor(BaseInstrumentor):
         ctx_logger.info(f"[CLIENT WRAPPER] tool name: {name}")
         ctx_logger.info(f"[CLIENT WRAPPER] original arguments: {arguments}")
 
-        with tracer.start_as_current_span("client.tool.call", kind=trace.SpanKind.CLIENT) as span:
-            span.set_attribute("span.kind", "CLIENT")
-            span.set_attribute("tool.name", name)
-            span.set_attribute("aws.span.kind", "CLIENT")
-            span.set_attribute("aws:service.span.kind", "CLIENT")
-            span.set_attribute("aws.xray.type", "segment")
-            span.set_attribute("aws.service.span.kind", "CLIENT")
-            span.set_attributes
-            span_ctx = span.get_span_context()
-            arguments["_meta"] = {
-                "trace_id": span_ctx.trace_id,
-                "span_id": span_ctx.span_id,
-            }
-            new_args = list(args)
-            if len(new_args) >= 2:
-                new_args[1] = arguments
-            elif len(new_args) == 1:
-                new_args.append(arguments)
-            else:
-                new_args = [name, arguments]
-
-            ctx_logger.info(f"[CLIENT WRAPPER] injected _meta: {arguments['_meta']}")
-            if len(args) >= 2:
-                new_args = (args[0], arguments)
-                result = await wrapped(*new_args)
-            else:
-                result = await wrapped(name=name, arguments=arguments)
+        with tracer.start_as_current_span("MCP Caller Service", kind=trace.SpanKind.SERVER) as parent_span:
+            parent_span.set_attribute("span.kind", "SERVER")
+            parent_span.set_attribute("dummydummy", "dummyserver")
             
-            ctx_logger.info(f"kwargs:{kwargs}")
-            ctx_logger.info(f"args: {args}")
-            ctx_logger.info(f"newargs:{new_args}")
-            ctx_logger.info(f"args received in clientcalltoolwrapper:{arguments}")
+            current_ctx = trace.set_span_in_context(parent_span)
+            
+            with tracer.start_as_current_span("client.tool.call", kind=trace.SpanKind.CLIENT,context=current_ctx) as span:
+                span.set_attribute("span.kind", "CLIENT")
+                span.set_attribute("tool.name", name)
+                span.set_attribute("clientdummytest", "EFVVDSVE")
+                
+                span_ctx = span.get_span_context()
+                arguments["_meta"] = {
+                    "trace_id": span_ctx.trace_id,
+                    "span_id": span_ctx.span_id,
+                }
+                
+                ctx_logger.info(f"[CLIENT WRAPPER] injected _meta: {arguments['_meta']}")
+                
+                if len(args) >= 2:
+                    result = await wrapped(args[0], arguments)
+                else:
+                    result = await wrapped(name=name, arguments=arguments)
+                
+                ctx_logger.info(f"kwargs:{kwargs}")
+                ctx_logger.info(f"args: {args}")
+                ctx_logger.info(f"args received in clientcalltoolwrapper:{arguments}")
 
-            return result
-
+                return result
 
     def _toolcall_wrapper(self, wrapped, instance, args, kwargs):
         original_decorator = wrapped(*args, **kwargs)
@@ -134,7 +128,7 @@ class MCPInstrumentor(BaseInstrumentor):
                     loggertwo.info(f"Found _meta context: {meta}")
                 else:
                     loggertwo.info("No _meta context found in arguments")
-                tracer = trace.get_tracer("mcp.server")
+                tracer = self.tracer_provider.get_tracer("mcp.server")
                 if isinstance(arguments, dict) and arguments.get("_meta"):
                     incomingtraceid = int(arguments.get("_meta").get("trace_id"))
                     incomingspanid = int(arguments.get("_meta").get("span_id"))
@@ -146,23 +140,32 @@ class MCPInstrumentor(BaseInstrumentor):
 
                 # # Create a context that includes the non-recording parent span
                 parent_ctx = trace.set_span_in_context(trace.NonRecordingSpan(span_context))
+                # parent_ctx = trace.set_span_in_context(
+                #     trace.SpanContext(
+                #         trace_id=incomingtraceid,
+                #         span_id=incomingspanid,
+                #         is_remote=True
+                #     )
+                # )
+                result = None
 
                 # Attach the context and make sure to detach afterward
                 with tracer.start_as_current_span("server.tool.call", kind=trace.SpanKind.SERVER,context= parent_ctx) as span:
                     span.set_attribute("tool.name", name)
                     span.set_attribute("server_side", True)
                     span.set_attribute("aws.span.kind", "SERVER")
-                    span.set_attribute("aws.xray.type", "subsegment")
-                    span.set_attribute("aws.service.span.kind", "SERVER")
+                    span.set_attribute("sjdfoisvmwe", "testetsetsets")
+                    
                     parent_id = getattr(span, '_parent', None)
                     parent_span_id = parent_id.span_id if parent_id else None
                     loggertwo.info(f"Span parent_id: {format(parent_span_id)}")
                     loggertwo.info(f"Span traceid without formatting: {span.get_span_context().trace_id}")
                     loggertwo.info(f"Span trace_id: {format(span.get_span_context().trace_id, '032x')}")
                     loggertwo.info(f"Span span_id: {format(span.get_span_context().span_id, '016x')}")
-                loggertwo.info(f"Spanaftertoken: {span}")
+                    loggertwo.info(f"Spanaftertoken: {span}")
                 self.tracer_provider.force_flush()
                 result = await func(name, arguments)
                 return result
+
             return original_decorator(instrumented_func)
         return wrapper

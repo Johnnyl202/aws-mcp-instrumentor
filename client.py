@@ -12,18 +12,18 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcess
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
 
 # Set up logging first so we can debug the instrumentation
-from src.mcpinstrumentor import setup_ctx_logger
-ctx_logger = setup_ctx_logger()
+# from src.mcpinstrumentor import setup_ctx_logger
+# ctx_logger = setup_ctx_logger()
 
 # Set up OpenTelemetry tracing with service name
 # resource = Resource.create({"service.name": "mcp-client"})
 tracer_provider = TracerProvider(sampler=ALWAYS_ON)
 
-otlp_exporter = OTLPSpanExporter(
-    endpoint = "localhost:4317",
-    insecure = True,  # Use insecure connection for local testing
+otlp_exporter = OTLPAwsSpanExporter(
+    endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
 )
 
 tracer_provider.add_span_processor(
@@ -49,11 +49,14 @@ from mcp.types import (
     CallToolRequest
 )
 from opentelemetry.context import Context
-
+import pytest
+from unittest.mock import Mock, patch
+from datetime import datetime
 
 async def main():
-    # OpenTelemetry tracer is already set up at the module level
-    tracer = trace.get_tracer("mcp.client")
+    # tools = await list_application_signals_services()
+    # print(tools)
+    # return tools
     # Connect to the server and manage session
     async with AsyncExitStack() as exit_stack:
         server_params = StdioServerParameters(
@@ -68,7 +71,7 @@ async def main():
             }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
-        session = await exit_stack.enter_async_context(ClientSession(reader, writer))
+        session = await exit_stack.enter_async_context(ClientSession(reader, writer))    
         await session.send_notification(
             ClientNotification(
                 InitializedNotification(method="notifications/initialized")
@@ -78,8 +81,6 @@ async def main():
             name="list_application_signals_services",
             arguments={}
         )
-        ctx_logger.info(f"Response: {response}")
-        # Print tool result
         print("\nTool execution result:")
         if hasattr(response, 'content') and response.content:
             for item in response.content:
@@ -89,8 +90,21 @@ async def main():
         else:
             print("No content found in response")
         
-        # Force flush to ensure all spans are exported
-        tracer_provider.force_flush()
+        # # Second function call with arguments
+        # response2 = await session.call_tool(
+        #     name="get_service_details",
+        #     arguments={"service_name": "example-service"}
+        # )
+        # ctx_logger.info(f"Response2: {response2}")
+        # print("\nSecond tool execution result:")
+        # if hasattr(response2, 'content') and response2.content:
+        #     for item in response2.content:
+        #         if hasattr(item, 'type') and item.type == 'text':
+        #             if hasattr(item, 'text'):
+        #                 print(item.text)
+        # else:
+        #     print("No content found in response2")
+    
     
 if __name__ == "__main__":
     asyncio.run(main())

@@ -8,12 +8,16 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
+from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+resource = Resource.create({
+    "service.name": "mcp-server",
+    "service.version": "1.0.0"
+})
+tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
 
-tracer_provider = TracerProvider(sampler=ALWAYS_ON)
 
-otlp_exporter = OTLPSpanExporter(
-    endpoint = "localhost:4317",
-    insecure = True,  # Set to True for local testing; use TLS in production
+otlp_exporter = OTLPAwsSpanExporter(
+    endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
 )
 
 tracer_provider.add_span_processor(
@@ -31,7 +35,6 @@ from typing import Dict, Optional
 import boto3
 from botocore.exceptions import ClientError
 from mcp.server.fastmcp import FastMCP
-
 
 # Initialize FastMCP server
 mcp = FastMCP("appsignals")

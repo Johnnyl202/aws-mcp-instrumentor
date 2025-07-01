@@ -1,8 +1,8 @@
-2025-06-30 16:39:36,738 - INFO - Using provided tracer_provider
-2025-06-30 16:39:37,177 - INFO - Server received - name: list_application_signals_services, arguments: {'_meta': {'trace_id': 137864230076486904116725648750790826636, 'span_id': 12931231552828698150}}
-2025-06-30 16:39:37,178 - INFO - Found _meta context: {'trace_id': 137864230076486904116725648750790826636, 'span_id': 12931231552828698150}
-2025-06-30 16:39:37,179 - INFO - Span parent_id: 12931231552828698150
-2025-06-30 16:39:37,179 - INFO - Span traceid without formatting: 137864230076486904116725648750790826636
-2025-06-30 16:39:37,180 - INFO - Span trace_id: 67b7af555f2bfa904daab0cdbae7da8c
-2025-06-30 16:39:37,180 - INFO - Span span_id: 269009efabef2816
-2025-06-30 16:39:37,181 - INFO - Spanaftertoken: _Span(name="server.tool.call", context=SpanContext(trace_id=0x67b7af555f2bfa904daab0cdbae7da8c, span_id=0x269009efabef2816, trace_flags=0x01, trace_state=[], is_remote=False))
+2025-07-01 16:46:07,554 - INFO - Using provided tracer_provider
+2025-07-01 16:46:07,876 - INFO - Server received - name: list_application_signals_services, arguments: {'_meta': {'trace_id': 120902018087092654812226092250917679254, 'span_id': 710094673346036773}}
+2025-07-01 16:46:07,877 - INFO - Found _meta context: {'trace_id': 120902018087092654812226092250917679254, 'span_id': 710094673346036773}
+2025-07-01 16:46:07,878 - INFO - Span parent_id: 710094673346036773
+2025-07-01 16:46:07,879 - INFO - Span traceid without formatting: 120902018087092654812226092250917679254
+2025-07-01 16:46:07,880 - INFO - Span trace_id: 5af4e1b6e6528890b83ff857305ab096
+2025-07-01 16:46:07,880 - INFO - Span span_id: 504fab8d0fcd070f
+2025-07-01 16:46:07,880 - INFO - Spanaftertoken: _Span(name="server.tool.call", context=SpanContext(trace_id=0x5af4e1b6e6528890b83ff857305ab096, span_id=0x504fab8d0fcd070f, trace_flags=0x01, trace_state=[], is_remote=False))
