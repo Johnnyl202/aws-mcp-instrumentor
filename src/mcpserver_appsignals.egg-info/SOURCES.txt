@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/mcpinstrumentor.py
+src/mcpserver_appsignals.egg-info/PKG-INFO
+src/mcpserver_appsignals.egg-info/SOURCES.txt
+src/mcpserver_appsignals.egg-info/dependency_links.txt
+src/mcpserver_appsignals.egg-info/entry_points.txt
+src/mcpserver_appsignals.egg-info/top_level.txt

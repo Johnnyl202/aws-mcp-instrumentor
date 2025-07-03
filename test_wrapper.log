@@ -1,0 +1,13 @@
+2025-06-27 16:50:36,249 - __main__ - INFO - Starting test client wrapper
+2025-06-27 16:50:36,552 - __main__ - INFO - Imported ClientSession from mcp.client.session
+2025-06-27 16:50:36,552 - __main__ - INFO - ClientSession.call_tool exists
+2025-06-27 16:50:36,552 - __main__ - INFO - Patched ClientSession.call_tool with our wrapper
+2025-06-27 16:50:36,552 - __main__ - INFO - Setting up client connection
+2025-06-27 16:50:36,559 - __main__ - INFO - Initializing session
+2025-06-27 16:50:36,560 - __main__ - INFO - Calling session.call_tool
+2025-06-27 16:50:36,560 - __main__ - INFO - ========== WRAPPER CALLED ==========
+2025-06-27 16:50:36,560 - __main__ - INFO - Name: list_application_signals_services
+2025-06-27 16:50:36,560 - __main__ - INFO - Arguments: {}
+2025-06-27 16:50:36,560 - __main__ - INFO - Added _meta: {'trace_id': 12345, 'span_id': 67890}
+2025-06-27 16:50:38,019 - __main__ - INFO - Got response: meta=None content=[TextContent(type='text', text='Application Signals Services (2 total):\n\n• Service: unknown_service\n  Type: Service\n  Key Attributes:\n    Environment: generic:default\n    Name: unknown_service\n    Type: Service\n\n• Service: mcp-server\n  Type: Service\n  Key Attributes:\n    Environment: generic:default\n    Name: mcp-server\n    Type: Service\n\n', annotations=None)] isError=False
+2025-06-27 16:50:38,023 - __main__ - INFO - Test complete
