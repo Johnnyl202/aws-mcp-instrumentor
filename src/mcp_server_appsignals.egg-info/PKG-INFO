@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: mcp-server-appsignals
+Version: 0.1.0
+Requires-Python: >=3.10
+Requires-Dist: boto3>=1.38.26
+Requires-Dist: httpx>=0.28.1
+Requires-Dist: mcp[cli]>=1.9.2
+Requires-Dist: opentelemetry-sdk>=1.22.0
+Requires-Dist: opentelemetry-api>=1.22.0
+Requires-Dist: opentelemetry-exporter-otlp>=1.22.0
+Requires-Dist: opentelemetry-instrumentation>=0.44b0
+Requires-Dist: openinference-instrumentation-mcp>=0.1.0
+Requires-Dist: opentelemetry-exporter-otlp-proto-grpc

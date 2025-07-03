@@ -20,7 +20,11 @@ from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExport
 
 # Set up OpenTelemetry tracing with service name
 # resource = Resource.create({"service.name": "mcp-client"})
-tracer_provider = TracerProvider(sampler=ALWAYS_ON)
+resource = Resource.create({
+    "service.name": "Client Node",
+    "service.version": "1.0.0"
+})
+tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
 
 otlp_exporter = OTLPAwsSpanExporter(
     endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
@@ -49,26 +53,14 @@ from mcp.types import (
     CallToolRequest
 )
 from opentelemetry.context import Context
-import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
 async def main():
-    # tools = await list_application_signals_services()
-    # print(tools)
-    # return tools
-    # Connect to the server and manage session
     async with AsyncExitStack() as exit_stack:
         server_params = StdioServerParameters(
             command="python",
             args=["mcpserver.py"],
-            env={
-                # **os.environ,
-                # "MCP_TRANSPORT": "stdio",
-                # "OTEL_TRACES_EXPORTER": "console",
-                # "OTEL_LOG_LEVEL": "debug",
-                # "OTEL_SERVICE_NAME": "mcp-server",
-            }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
         session = await exit_stack.enter_async_context(ClientSession(reader, writer))    
@@ -89,22 +81,6 @@ async def main():
                         print(item.text)
         else:
             print("No content found in response")
-        
-        # # Second function call with arguments
-        # response2 = await session.call_tool(
-        #     name="get_service_details",
-        #     arguments={"service_name": "example-service"}
-        # )
-        # ctx_logger.info(f"Response2: {response2}")
-        # print("\nSecond tool execution result:")
-        # if hasattr(response2, 'content') and response2.content:
-        #     for item in response2.content:
-        #         if hasattr(item, 'type') and item.type == 'text':
-        #             if hasattr(item, 'text'):
-        #                 print(item.text)
-        # else:
-        #     print("No content found in response2")
-    
     
 if __name__ == "__main__":
     asyncio.run(main())

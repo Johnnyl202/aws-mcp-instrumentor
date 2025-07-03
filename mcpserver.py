@@ -6,11 +6,10 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from src.mcpinstrumentor import MCPInstrumentor
 from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
 resource = Resource.create({
-    "service.name": "mcp-server",
+    "service.name": "appsignals",
     "service.version": "1.0.0"
 })
 tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
@@ -24,13 +23,13 @@ tracer_provider.add_span_processor(
     BatchSpanProcessor(otlp_exporter)
 )
 trace.set_tracer_provider(tracer_provider)
-MCPInstrumentor().instrument(tracer_provider=tracer_provider)
+MCPInstrumentor().instrument(tracer_provider=tracer_provider, service_name = "appsignals")
 
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
-from time import perf_counter as timer
+from datetime import datetime, time, timedelta
+from time import perf_counter as timer, sleep
 from typing import Dict, Optional
 import boto3
 from botocore.exceptions import ClientError
@@ -1069,6 +1068,10 @@ async def query_xray_traces(
         return json.dumps({"error": str(e)}, indent=2)
 
 
-if __name__ == "__main__":
-    # Initialize and run the server
+
+def main():
     mcp.run(transport="stdio")
+
+if __name__ == "__main__":
+    main()
+    

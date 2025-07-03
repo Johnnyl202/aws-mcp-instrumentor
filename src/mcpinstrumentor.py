@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Callable, Collection, Tuple, cast
+from opentelemetry.sdk.resources import Resource
 from opentelemetry import context, propagate
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor  
 from opentelemetry.instrumentation.utils import unwrap
@@ -45,7 +46,7 @@ class MCPInstrumentor(BaseInstrumentor):
     def instrumentation_dependencies(self) -> Collection[str]:
         return _instruments
 
-    def _instrument(self, **kwargs: Any) -> None:
+    def _instrument(self, **kwargs: Any) -> None:        
         if kwargs.get("tracer_provider"):
             tracer_provider = kwargs["tracer_provider"]
             loggertwo.info("Using provided tracer_provider")
@@ -165,6 +166,8 @@ class MCPInstrumentor(BaseInstrumentor):
                     loggertwo.info(f"Spanaftertoken: {span}")
                 self.tracer_provider.force_flush()
                 result = await func(name, arguments)
+                loggertwo.info(f"namedetectedd:{name}")
+
                 return result
 
             return original_decorator(instrumented_func)
