@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: mcpserver-appsignals
-Version: 0.1.0
-Summary: Local MCP server for Claude Desktop
-Requires-Python: >=3.8

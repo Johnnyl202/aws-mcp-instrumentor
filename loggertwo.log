@@ -1,9 +1,0 @@
-2025-07-02 17:27:55,586 - INFO - Using provided tracer_provider
-2025-07-02 17:27:55,909 - INFO - Server received - name: list_application_signals_services, arguments: {'_meta': {'trace_id': 255372501923409215502822534312887098018, 'span_id': 6473179672403637026}}
-2025-07-02 17:27:55,910 - INFO - Found _meta context: {'trace_id': 255372501923409215502822534312887098018, 'span_id': 6473179672403637026}
-2025-07-02 17:27:55,910 - INFO - Span parent_id: 6473179672403637026
-2025-07-02 17:27:55,911 - INFO - Span traceid without formatting: 255372501923409215502822534312887098018
-2025-07-02 17:27:55,911 - INFO - Span trace_id: c01ef47092dcdf7b04b68a37a6ac9aa2
-2025-07-02 17:27:55,911 - INFO - Span span_id: 355186fc380f1fcd
-2025-07-02 17:27:55,912 - INFO - Spanaftertoken: _Span(name="server.tool.call", context=SpanContext(trace_id=0xc01ef47092dcdf7b04b68a37a6ac9aa2, span_id=0x355186fc380f1fcd, trace_flags=0x01, trace_state=[], is_remote=False))
-2025-07-02 17:28:56,862 - INFO - namedetectedd:list_application_signals_services

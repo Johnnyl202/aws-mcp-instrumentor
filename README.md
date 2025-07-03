@@ -1,63 +1,39 @@
-# AWS OpenTelemetry Setup
+# AWS Application Signals MCP Server
+
+MCP server for monitoring AWS Application Signals services with OpenTelemetry instrumentation.
 
 ## Installation
 
-Install the AWS Distro for OpenTelemetry Python auto-instrumentation agent:
-
 ```bash
-pip install aws-opentelemetry-distro
+pip install -r requirements.txt
 ```
 
-## Environment Variables
+## Usage
 
-Set the following environment variables before starting your application:
-
-### Required Variables
-
+Run the MCP server:
 ```bash
-export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://xray.[AWSRegion].amazonaws.com/v1/traces"
+python mcpserver.py
 ```
 
-Example for us-west-2:
-```bash
-export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://xray.us-west-2.amazonaws.com/v1/traces"
-```
+## Tools
 
-### Recommended Variables
+- `list_application_signals_services` - List all monitored services
+- `get_service_details` - Get detailed service information
+- `get_service_metrics` - Retrieve CloudWatch metrics for services
+- `get_service_level_objective` - Get detailed SLO configuration and thresholds
+- `run_transaction_search` - Execute CloudWatch Logs Insights queries on spans data
+- `get_sli_status` - Check SLI status and SLO compliance across all services
+- `query_xray_traces` - Query AWS X-Ray traces for error investigation
 
-```bash
-export OTEL_METRICS_EXPORTER=none
-export OTEL_LOGS_EXPORTER=none
-export OTEL_TRACES_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-```
+## Configuration
 
-### Optional Variables
+Ensure AWS credentials are configured via:
+- AWS CLI (`aws configure`)
+- Environment variables
+- IAM roles
 
-```bash
-export OTEL_RESOURCE_ATTRIBUTES="service.name=YourServiceName,deployment.environment=YourEnvironment"
-```
-
-- `service.name`: Sets the service name (default: UnknownService)
-- `deployment.environment`: Sets the deployment environment (defaults based on hosting type)
-
-## Running Your Application
-
-Start your application with OpenTelemetry instrumentation:
-
-```bash
-OTEL_METRICS_EXPORTER=none \
-OTEL_LOGS_EXPORTER=none \
-OTEL_PYTHON_DISTRO=aws_distro \
-OTEL_PYTHON_CONFIGURATOR=aws_configurator \
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://xray.us-east-1.amazonaws.com/v1/traces \
-OTEL_RESOURCE_ATTRIBUTES="service.name=$SVC_NAME" \
-opentelemetry-instrument python $MY_PYTHON_APP.py
-```
-
-Replace `$SVC_NAME` with your application name and `$MY_PYTHON_APP.py` with your Python application file.
-
-## Viewing Traces
-
-Traces are stored in the `aws/spans` CloudWatch Logs LogGroup and can be viewed in the CloudWatch Traces and Metrics Console.
+Required AWS permissions:
+- `application-signals:ListServices`
+- `application-signals:GetService`
+- `cloudwatch:GetMetricStatistics`
+- `logs:DescribeLogGroups`

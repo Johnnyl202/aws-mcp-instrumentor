@@ -1,2 +1,0 @@
-[console_scripts]
-mcp-server-appsignals = mcp_server_appsignals.__main__:main

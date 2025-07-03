@@ -1,0 +1,33 @@
+{
+  "name": "server.tool.call",
+  "trace_id": "a1148d849467ce2b8a301ee2585ec2b6",
+  "span_id": "8ada1f2d17494964",
+  "attributes": {
+    "tool.name": "list_application_signals_services",
+    "server_side": true
+  },
+  "timestamp": "2025-06-22 13:17:56.912014"
+}
+
+{
+  "name": "server.tool.call",
+  "trace_id": "38f759679c322b6414658df1798eddbc",
+  "span_id": "59a35689ffde4368",
+  "attributes": {
+    "tool.name": "list_application_signals_services",
+    "server_side": true
+  },
+  "timestamp": "2025-06-23 09:39:47.459929"
+}
+
+{
+  "name": "server.tool.call",
+  "trace_id": "685d7cb3aef369373405d56552244853",
+  "span_id": "903edb3252f605f7",
+  "attributes": {
+    "tool.name": "list_application_signals_services",
+    "server_side": true
+  },
+  "timestamp": "2025-06-23 09:40:47.537524"
+}
+

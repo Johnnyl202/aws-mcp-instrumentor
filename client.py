@@ -1,47 +1,15 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Import all modules first
+from src.mcpinstrumentor import MCPInstrumentor
+MCPInstrumentor().instrument()
 import asyncio
-import logging
+import os
 from contextlib import AsyncExitStack
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
-from opentelemetry.sdk.trace.sampling import ALWAYS_ON
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
-
-# Set up logging first so we can debug the instrumentation
-# from src.mcpinstrumentor import setup_ctx_logger
-# ctx_logger = setup_ctx_logger()
-
-# Set up OpenTelemetry tracing with service name
-# resource = Resource.create({"service.name": "mcp-client"})
-resource = Resource.create({
-    "service.name": "Client Node",
-    "service.version": "1.0.0"
-})
-tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
-
-otlp_exporter = OTLPAwsSpanExporter(
-    endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
-)
-
-tracer_provider.add_span_processor(
-    BatchSpanProcessor(otlp_exporter)
-)
-trace.set_tracer_provider(tracer_provider)
-from src.mcpinstrumentor import MCPInstrumentor
-instrumentor = MCPInstrumentor()
-instrumentor.instrument(tracer_provider=tracer_provider)
-
-from mcp import StdioServerParameters
-from mcp.client.session import ClientSession
-
-
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import (
     ClientRequest,
@@ -52,35 +20,75 @@ from mcp.types import (
     ListToolsResult,
     CallToolRequest
 )
-from opentelemetry.context import Context
-from unittest.mock import Mock, patch
-from datetime import datetime
 
 async def main():
+    # Set up OpenTelemetry tracer
+    console_exporter = ConsoleSpanExporter()
+    tracer_provider = trace_sdk.TracerProvider(sampler=trace_sdk.sampling.ALWAYS_ON)
+    tracer_provider.add_span_processor(SimpleSpanProcessor(console_exporter))
+    trace.set_tracer_provider(tracer_provider)
+    tracer = trace.get_tracer("testclient")
+
+    # Connect to the server and manage session
     async with AsyncExitStack() as exit_stack:
         server_params = StdioServerParameters(
             command="python",
             args=["mcpserver.py"],
+            env={
+                **os.environ,
+                "MCP_TRANSPORT": "stdio",
+                "OTEL_TRACES_EXPORTER": "console",
+                "OTEL_LOG_LEVEL": "debug"
+            }
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
-        session = await exit_stack.enter_async_context(ClientSession(reader, writer))    
-        await session.send_notification(
-            ClientNotification(
-                InitializedNotification(method="notifications/initialized")
+
+        # Open a client span to cover the whole session
+        with tracer.start_as_current_span("client.session", kind=trace.SpanKind.CLIENT) as span:
+            span.set_attribute("client_side", True)
+            span.set_attribute("tool_name", "list_application_signals_services")
+
+            session = await exit_stack.enter_async_context(ClientSession(reader, writer))
+
+            await session.send_notification(
+                ClientNotification(
+                    InitializedNotification(method="notifications/initialized")
+                )
             )
-        )
-        response = await session.call_tool(
-            name="list_application_signals_services",
-            arguments={}
-        )
-        print("\nTool execution result:")
-        if hasattr(response, 'content') and response.content:
-            for item in response.content:
-                if hasattr(item, 'type') and item.type == 'text':
-                    if hasattr(item, 'text'):
-                        print(item.text)
-        else:
-            print("No content found in response")
-    
+
+            # List tools
+            tools_result = await session.send_request(
+                ClientRequest(
+                    root=ListToolsRequest(method="tools/list")
+                ),
+                ListToolsResult,
+            )
+            print("Tools available:", [tool.name for tool in tools_result.tools])
+
+            # Call the tool while span is active
+            span.add_event("Sending tool call request")
+            response = await session.send_request(
+                ClientRequest(
+                    root=CallToolRequest(
+                        method="tools/call",
+                        params={
+                            "name": "list_application_signals_services",
+                            "arguments": {}
+                        }
+                   )
+                ),
+                ClientResult,
+            )
+            span.add_event("Received tool call response")
+
+    # Print tool result
+    print("\nTool execution result:")
+    if hasattr(response.root, 'content') and response.root.content:
+        for item in response.root.content:
+            if item.get('type') == 'text':
+                print(item.get('text', ''))
+    else:
+        print("No content found in response")
+
 if __name__ == "__main__":
     asyncio.run(main())
