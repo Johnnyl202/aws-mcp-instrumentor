@@ -73,14 +73,28 @@ async def main():
             name="list_application_signals_services",
             arguments={}
         )
-        print("\nTool execution result:")
-        if hasattr(response, 'content') and response.content:
-            for item in response.content:
-                if hasattr(item, 'type') and item.type == 'text':
-                    if hasattr(item, 'text'):
-                        print(item.text)
-        else:
-            print("No content found in response")
+        # print("\nTool execution result:")
+        # if hasattr(response, 'content') and response.content:
+        #     for item in response.content:
+        #         if hasattr(item, 'type') and item.type == 'text':
+        #             if hasattr(item, 'text'):
+        #                 print(item.text)
+        # else:
+        #     print("No content found in response")
+
+        responsetwo = await session.list_tools()
+        print("Available Tools:")
+        print("=" * 50)
+        for i, tool in enumerate(responsetwo.tools, 1):
+            print(f"{i}. {tool.name}")
+            print(f"   Description: {tool.description[:100]}...")
+            if tool.inputSchema and 'properties' in tool.inputSchema:
+                required = tool.inputSchema.get('required', [])
+                props = list(tool.inputSchema['properties'].keys())
+                print(f"   Parameters: {', '.join(props)}")
+                if required:
+                    print(f"   Required: {', '.join(required)}")
+            print()
     
 if __name__ == "__main__":
     asyncio.run(main())

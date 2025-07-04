@@ -57,7 +57,7 @@ class MCPInstrumentor(BaseInstrumentor):
             lambda _: wrap_function_wrapper(
                 "mcp.server.lowlevel.server",
                 "Server.call_tool",
-                self._toolcall_wrapper,
+                self._server_toolcall_wrapper,
             ),
             "mcp.server.lowlevel.server",
         )
@@ -69,9 +69,67 @@ class MCPInstrumentor(BaseInstrumentor):
             ),
             "mcp.client.session",
         )
+        register_post_import_hook(
+            lambda _: wrap_function_wrapper(
+                "mcp.server.lowlevel.server",
+                "Server.list_tools",
+                self._server_listtool_wrapper,
+            ),
+            "mcp.server.lowlevel.server",
+        )
+        register_post_import_hook(
+            lambda _: wrap_function_wrapper(
+                "mcp.client.session",
+                "ClientSession.list_tools",
+                self._client_list_tool_wrapper,
+            ),
+            "mcp.client.session",
+        )
     def _uninstrument(self, **kwargs: Any) -> None:
         unwrap("mcp.client.stdio", "stdio_client")
         unwrap("mcp.server.stdio", "satdio_server")
+    
+    async def _client_list_tool_wrapper(self, wrapped, instance, args, kwargs):
+        tracer = self.tracer_provider.get_tracer("mcp.client")
+        
+        with tracer.start_as_current_span("MCP List Tools Service", kind=trace.SpanKind.SERVER) as parent_span:
+            parent_span.set_attribute("span.kind", "SERVER")
+            current_ctx = trace.set_span_in_context(parent_span)
+
+            with tracer.start_as_current_span(name="client.tool.list", kind=trace.SpanKind.CLIENT, context=current_ctx) as span:
+                span.set_attribute("span.kind", "CLIENT")
+                span.set_attribute("aws.remote.service", "appsignals")
+                span.set_attribute("aws.remote.operation", "List Tools")
+
+                # Set the span context as the current context for propagation
+                token = context.attach(current_ctx)
+                try:
+                    result = await wrapped(*args, *kwargs)
+                    return result
+                finally:
+                    context.detach(token)
+
+    def _server_listtool_wrapper(self, wrapped, instance, args, kwargs):
+        original_decorator = wrapped(*args, **kwargs)
+        def wrapper(func):
+            async def instrumented_func(*func_args, **func_kwargs):
+                tracer = self.tracer_provider.get_tracer("ListToolServerSide")
+                current_context = context.get_current()
+                
+                with tracer.start_as_current_span("server.tool.list", kind=trace.SpanKind.SERVER, context=current_context) as span:
+                    span.set_attribute("server_side", True)
+                    span.set_attribute("aws.span.kind", "SERVER")
+                    span.set_attribute("operation", "list_tools")
+                    
+                result = await func(*func_args, **func_kwargs)
+                self.tracer_provider.force_flush()
+                return result
+                
+            return original_decorator(instrumented_func)
+        return wrapper
+
+
+
     
     async def _client_call_tool_wrapper(self, wrapped, instance, args, kwargs):
         tracer = self.tracer_provider.get_tracer("mcp.client")
@@ -92,10 +150,12 @@ class MCPInstrumentor(BaseInstrumentor):
             
             current_ctx = trace.set_span_in_context(parent_span)
             
-            with tracer.start_as_current_span("client.tool.call", kind=trace.SpanKind.CLIENT,context=current_ctx) as span:
+            with tracer.start_as_current_span(name = "client.tool.call", kind=trace.SpanKind.CLIENT,context=current_ctx) as span:
                 span.set_attribute("span.kind", "CLIENT")
                 span.set_attribute("tool.name", name)
                 span.set_attribute("clientdummytest", "EFVVDSVE")
+                span.set_attribute("aws.remote.service", "Client Tool Call")
+                span.set_attribute("aws.remote.operation", name)
                 
                 span_ctx = span.get_span_context()
                 arguments["_meta"] = {
@@ -113,17 +173,15 @@ class MCPInstrumentor(BaseInstrumentor):
                 ctx_logger.info(f"kwargs:{kwargs}")
                 ctx_logger.info(f"args: {args}")
                 ctx_logger.info(f"args received in clientcalltoolwrapper:{arguments}")
-
                 return result
 
-    def _toolcall_wrapper(self, wrapped, instance, args, kwargs):
+    def _server_toolcall_wrapper(self, wrapped, instance, args, kwargs):
         original_decorator = wrapped(*args, **kwargs)
         def wrapper(func):
             async def instrumented_func(name, arguments=None):
                 from opentelemetry import trace, context
                 loggertwo.info(f"Server received - name: {name}, arguments: {arguments}")
                 
-                # Check for _meta trace context
                 if arguments and isinstance(arguments, dict) and "_meta" in arguments:
                     meta = arguments["_meta"]
                     loggertwo.info(f"Found _meta context: {meta}")
@@ -139,35 +197,15 @@ class MCPInstrumentor(BaseInstrumentor):
                     is_remote=True,
                 )
 
-                # # Create a context that includes the non-recording parent span
                 parent_ctx = trace.set_span_in_context(trace.NonRecordingSpan(span_context))
-                # parent_ctx = trace.set_span_in_context(
-                #     trace.SpanContext(
-                #         trace_id=incomingtraceid,
-                #         span_id=incomingspanid,
-                #         is_remote=True
-                #     )
-                # )
                 result = None
-
-                # Attach the context and make sure to detach afterward
                 with tracer.start_as_current_span("server.tool.call", kind=trace.SpanKind.SERVER,context= parent_ctx) as span:
                     span.set_attribute("tool.name", name)
                     span.set_attribute("server_side", True)
                     span.set_attribute("aws.span.kind", "SERVER")
                     span.set_attribute("sjdfoisvmwe", "testetsetsets")
-                    
-                    parent_id = getattr(span, '_parent', None)
-                    parent_span_id = parent_id.span_id if parent_id else None
-                    loggertwo.info(f"Span parent_id: {format(parent_span_id)}")
-                    loggertwo.info(f"Span traceid without formatting: {span.get_span_context().trace_id}")
-                    loggertwo.info(f"Span trace_id: {format(span.get_span_context().trace_id, '032x')}")
-                    loggertwo.info(f"Span span_id: {format(span.get_span_context().span_id, '016x')}")
-                    loggertwo.info(f"Spanaftertoken: {span}")
                 self.tracer_provider.force_flush()
                 result = await func(name, arguments)
-                loggertwo.info(f"namedetectedd:{name}")
-
                 return result
 
             return original_decorator(instrumented_func)
