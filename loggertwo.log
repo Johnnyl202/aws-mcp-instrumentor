@@ -1,3 +1,1 @@
-2025-07-03 16:58:27,352 - INFO - Using provided tracer_provider
-2025-07-03 16:58:27,673 - INFO - Server received - name: list_application_signals_services, arguments: {'_meta': {'trace_id': 1123698273628304766088585918809624170, 'span_id': 4569574345769360831}}
-2025-07-03 16:58:27,674 - INFO - Found _meta context: {'trace_id': 1123698273628304766088585918809624170, 'span_id': 4569574345769360831}
+2025-07-09 12:08:39,189 - INFO - Using provided tracer_provider

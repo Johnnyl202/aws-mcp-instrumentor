@@ -21,7 +21,7 @@ from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExport
 # Set up OpenTelemetry tracing with service name
 # resource = Resource.create({"service.name": "mcp-client"})
 resource = Resource.create({
-    "service.name": "Client Node",
+    "service.name": "Client Agent",
     "service.version": "1.0.0"
 })
 tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
@@ -69,6 +69,7 @@ async def main():
                 InitializedNotification(method="notifications/initialized")
             )
         )
+        # await session.initialize()
         response = await session.call_tool(
             name="list_application_signals_services",
             arguments={}
@@ -83,18 +84,19 @@ async def main():
         #     print("No content found in response")
 
         responsetwo = await session.list_tools()
-        print("Available Tools:")
-        print("=" * 50)
-        for i, tool in enumerate(responsetwo.tools, 1):
-            print(f"{i}. {tool.name}")
-            print(f"   Description: {tool.description[:100]}...")
-            if tool.inputSchema and 'properties' in tool.inputSchema:
-                required = tool.inputSchema.get('required', [])
-                props = list(tool.inputSchema['properties'].keys())
-                print(f"   Parameters: {', '.join(props)}")
-                if required:
-                    print(f"   Required: {', '.join(required)}")
-            print()
+        # print("Available Tools:")
+        # print("=" * 50)
+        # for i, tool in enumerate(responsetwo.tools, 1):
+        #     print(f"{i}. {tool.name}")
+        #     print(f"   Description: {tool.description[:100]}...")
+        #     if tool.inputSchema and 'properties' in tool.inputSchema:
+        #         required = tool.inputSchema.get('required', [])
+        #         props = list(tool.inputSchema['properties'].keys())
+        #         print(f"   Parameters: {', '.join(props)}")
+        #         if required:
+        #             print(f"   Required: {', '.join(required)}")
+        #     print()
+        # responsethree = await session.list_resources()
     
 if __name__ == "__main__":
     asyncio.run(main())
