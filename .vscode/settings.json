@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./aws-otel-python-instrumentation/aws-opentelemetry-distro/src"
+    ]
+}

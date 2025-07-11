@@ -1,1 +1,7 @@
-2025-07-09 12:08:39,189 - INFO - Using provided tracer_provider
+2025-07-11 16:47:17,023 - INFO - No tracer_provider provided
+2025-07-11 16:47:17,457 - INFO - Server handle request wrapper called
+2025-07-11 16:47:17,457 - INFO - Trace ID: b2025-07-11 16:47:17,459 - INFO - sendrequestcalled1
+2025-07-11 16:47:17,459 - INFO - {'method': 'tools/list', 'params': {'_meta': {'trace_context': {'trace_id': 234198799322252758351992814325493852275, 'span_id': 7157258031321198377}}}}
+2025-07-11 16:47:17,459 - INFO - sendrequestcalled4
+etry.trace.ProxyTracerProvider'>
+2025-07-11 16:47:17,458 - INFO - NonRecordingSpan(SpanContext(trace_id=0x00000000000000000000000000000000, span_id=0x0000000000000000, trace_flags=0x00, trace_state=[], is_remote=False))

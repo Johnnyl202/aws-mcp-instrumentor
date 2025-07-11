@@ -11,8 +11,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+# from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+# from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 
 # Set up logging first so we can debug the instrumentation
 # from src.mcpinstrumentor import setup_ctx_logger
@@ -26,17 +27,21 @@ resource = Resource.create({
 })
 tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
 
-otlp_exporter = OTLPAwsSpanExporter(
-    endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
-)
+# otlp_exporter = OTLPAwsSpanExporter(
+#     endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
+# )
 
+# tracer_provider.add_span_processor(
+#     BatchSpanProcessor(otlp_exporter)
+# )
+console_exporter = ConsoleSpanExporter()
 tracer_provider.add_span_processor(
-    BatchSpanProcessor(otlp_exporter)
+    SimpleSpanProcessor(console_exporter)
 )
 trace.set_tracer_provider(tracer_provider)
-from src.mcpinstrumentor import MCPInstrumentor
-instrumentor = MCPInstrumentor()
-instrumentor.instrument(tracer_provider=tracer_provider)
+# from src.mcpinstrumentor import MCPInstrumentor
+# instrumentor = MCPInstrumentor()
+# instrumentor.instrument(tracer_provider=tracer_provider)
 
 from mcp import StdioServerParameters
 from mcp.client.session import ClientSession
@@ -59,8 +64,12 @@ from datetime import datetime
 async def main():
     async with AsyncExitStack() as exit_stack:
         server_params = StdioServerParameters(
-            command="python",
-            args=["mcpserver.py"],
+            command="opentelemetry-instrument",
+            args=[
+                "python3", "mcpserver.py"
+            ],
+            # command="python",
+            # args=["mcpserver.py"],
         )
         reader, writer = await exit_stack.enter_async_context(stdio_client(server_params))
         session = await exit_stack.enter_async_context(ClientSession(reader, writer))    
@@ -70,10 +79,10 @@ async def main():
             )
         )
         # await session.initialize()
-        response = await session.call_tool(
-            name="list_application_signals_services",
-            arguments={}
-        )
+        # response = await session.call_tool(
+        #     name="list_application_signals_services",
+        #     arguments={}
+        # )
         # print("\nTool execution result:")
         # if hasattr(response, 'content') and response.content:
         #     for item in response.content:

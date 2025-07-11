@@ -1,29 +1,29 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.trace.sampling import ALWAYS_ON
-from opentelemetry.sdk.resources import Resource
-from src.mcpinstrumentor import MCPInstrumentor
-from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
-resource = Resource.create({
-    "service.name": "appsignals",
-    "service.version": "1.0.0"
-})
-tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
+# from opentelemetry import trace
+# from opentelemetry.sdk.trace import TracerProvider
+# from opentelemetry.sdk.trace.export import BatchSpanProcessor
+# from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+# from opentelemetry.sdk.resources import Resource
+# from src.mcpinstrumentor import MCPInstrumentor
+# from amazon.opentelemetry.distro.otlp_aws_span_exporter import OTLPAwsSpanExporter
+# resource = Resource.create({
+#     "service.name": "appsignals",
+#     "service.version": "1.0.0"
+# })
+# tracer_provider = TracerProvider(sampler=ALWAYS_ON,resource=resource)
 
 
-otlp_exporter = OTLPAwsSpanExporter(
-    endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
-)
+# otlp_exporter = OTLPAwsSpanExporter(
+#     endpoint = "https://xray.us-east-1.amazonaws.com/v1/traces",
+# )
 
-tracer_provider.add_span_processor(
-    BatchSpanProcessor(otlp_exporter)
-)
-trace.set_tracer_provider(tracer_provider)
-MCPInstrumentor().instrument(tracer_provider=tracer_provider, service_name = "appsignals")
+# tracer_provider.add_span_processor(
+#     BatchSpanProcessor(otlp_exporter)
+# )
+# trace.set_tracer_provider(tracer_provider)
+# MCPInstrumentor().instrument(tracer_provider=tracer_provider, service_name = "appsignals")
 
 import asyncio
 import json

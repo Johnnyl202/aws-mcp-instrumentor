@@ -4,8 +4,8 @@ from opentelemetry import context, propagate
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor  
 from opentelemetry.instrumentation.utils import unwrap
 from wrapt import ObjectProxy, register_post_import_hook, wrap_function_wrapper
-from openinference.instrumentation.mcp.package import _instruments
-
+# from openinference.instrumentation.mcp.package import _instruments
+_instruments = ["mcp"]
 from opentelemetry import trace 
 
 import logging
@@ -34,9 +34,12 @@ class MCPInstrumentor(BaseInstrumentor):
         if kwargs.get("tracer_provider"):
             tracer_provider = kwargs["tracer_provider"]
             loggertwo.info("Using provided tracer_provider")
+            self.tracer_provider = tracer_provider
         else:
+            tracer_provider = trace.get_tracer_provider()
+            self.tracer_provider = None
             loggertwo.info("No tracer_provider provided")
-        self.tracer_provider = tracer_provider
+        # self.tracer_provider = kwargs.get("tracer_provider")
         register_post_import_hook(
             lambda _: wrap_function_wrapper(
                 "mcp.shared.session",
@@ -110,6 +113,9 @@ class MCPInstrumentor(BaseInstrumentor):
         behavior because it reconstructs the request object with the same type and calling the original function with identical parameters.
     """
         async def async_wrapper():
+            if self.tracer_provider is None:
+                self.tracer_provider = trace.get_tracer_provider()
+                loggertwo.info(f"Got tracer provider at runtime: {type(self.tracer_provider)}")
             tracer = self.tracer_provider.get_tracer("mcp.client")
             # Create parent span to represent the overall MCP service call to achieve the correct trace map for CloudWatch
             with tracer.start_as_current_span("MCP Caller Service", kind=trace.SpanKind.SERVER) as parent_span:
@@ -131,11 +137,14 @@ class MCPInstrumentor(BaseInstrumentor):
                         if len(args) > 0:
                             new_args = (modified_request,) + args[1:]
                             result = await wrapped(*new_args, **kwargs)
+                            loggertwo.info("sendrequestcalled1")
+                            loggertwo.info(request_data)
                         else:
                             kwargs['request'] = modified_request
                             result = await wrapped(*args, **kwargs)
                     else:
                         result = await wrapped(*args, **kwargs)
+                    loggertwo.info("sendrequestcalled4")
                     return result
         
         return async_wrapper()
@@ -158,6 +167,7 @@ class MCPInstrumentor(BaseInstrumentor):
         also does not change the original function's behavior by calling it with identical parameters 
         ensuring no breaking changes to the MCP server functionality.
     """
+        loggertwo.info("Server handle request wrapper called")
         req = args[1] if len(args) > 1 else None
         trace_context = None
         if req and hasattr(req, 'params') and req.params and hasattr(req.params, 'meta') and req.params.meta:
@@ -166,14 +176,23 @@ class MCPInstrumentor(BaseInstrumentor):
         if trace_context:
             trace_id = trace_context.get('trace_id')
             span_id = trace_context.get('span_id')
-            from opentelemetry import trace
-            span_context = trace.SpanContext(trace_id=trace_id, span_id=span_id, is_remote=True)
+            loggertwo.info(f"Trace ID: {trace_id:032x}")
+            span_context = trace.SpanContext(trace_id=trace_id, span_id=span_id, is_remote=True,trace_flags=trace.TraceFlags.SAMPLED )
+            if self.tracer_provider is None:
+                self.tracer_provider = trace.get_tracer_provider()
+                loggertwo.info(f"Got tracer provider at runtime: {type(self.tracer_provider)}")
             tracer = self.tracer_provider.get_tracer("mcp.server")
             span_name = self.getname(req)
             with tracer.start_as_current_span(span_name,kind=trace.SpanKind.SERVER,context=trace.set_span_in_context(trace.NonRecordingSpan(span_context))) as span:
                 self.handle_attributes(span, req, False)
                 result = await wrapped(*args, **kwargs)
-                self.tracer_provider.force_flush()
+                loggertwo.info("Server handle request wrapper called")
+                new_span_ctx = span.get_span_context()
+                loggertwo.info(f"Tracer provider type: {type(self.tracer_provider)}")
+                loggertwo.info(span)
+                # self.tracer_provider.force_flush()
                 return result
         else:
-            return await wrapped(*args, **kwargs)
+            result = await wrapped(*args, **kwargs)
+            loggertwo.info("Server handle request wrapper called")
+            return result
