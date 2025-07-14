@@ -1,0 +1,2 @@
+2025-07-14 10:51:00,831 - INFO - _Span(name="tools/call", context=SpanContext(trace_id=0x6875437d61e8e56f4118be7b622438a1, span_id=0xf8d6fb0d404f0240, trace_flags=0x01, trace_state=[], is_remote=False))
+2025-07-14 10:51:00,838 - INFO - _Span(name="tools/list", context=SpanContext(trace_id=0x687543849c4d6239c0fd53e1fd812e88, span_id=0x73563ba8612ed9c1, trace_flags=0x01, trace_state=[], is_remote=False))
