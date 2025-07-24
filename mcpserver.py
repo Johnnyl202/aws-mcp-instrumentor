@@ -833,131 +833,131 @@ async def get_slo(slo_id: str) -> str:
         return f"Error: {str(e)}"
 
 
-# @mcp.tool()
-# async def search_transaction_spans(
-#     log_group_name: str = "",
-#     start_time: str = "",
-#     end_time: str = "",
-#     query_string: str = "",
-#     limit: str = "",
-#     max_timeout: str = "30",
-#     **kwargs
-# ) -> Dict:
-#     """Executes a CloudWatch Logs Insights query for transaction search (100% sampled trace data).
+@mcp.tool()
+async def search_transaction_spans(
+    log_group_name: str = "",
+    start_time: str = "",
+    end_time: str = "",
+    query_string: str = "",
+    limit: str = "",
+    max_timeout: str = "",
+    **kwargs
+) -> Dict:
+    """Executes a CloudWatch Logs Insights query for transaction search (100% sampled trace data).
 
-#     IMPORTANT: If log_group_name is not provided use 'aws/spans' as default cloudwatch log group name.
-#     The volume of returned logs can easily overwhelm the agent context window. Always include a limit in the query
-#     (| limit 50) or using the limit parameter.
+    IMPORTANT: If log_group_name is not provided use 'aws/spans' as default cloudwatch log group name.
+    The volume of returned logs can easily overwhelm the agent context window. Always include a limit in the query
+    (| limit 50) or using the limit parameter.
 
-#     Usage:
-#     "aws/spans" log group stores OpenTelemetry Spans data with many attributes for all monitored services.
-#     This provides 100% sampled data vs X-Ray's 5% sampling, giving more accurate results.
-#     User can write CloudWatch Logs Insights queries to group, list attribute with sum, avg.
+    Usage:
+    "aws/spans" log group stores OpenTelemetry Spans data with many attributes for all monitored services.
+    This provides 100% sampled data vs X-Ray's 5% sampling, giving more accurate results.
+    User can write CloudWatch Logs Insights queries to group, list attribute with sum, avg.
 
-#     ```
-#     FILTER attributes.aws.local.service = "customers-service-java" and attributes.aws.local.environment = "eks:demo/default" and attributes.aws.remote.operation="InvokeModel"
-#     | STATS sum(`attributes.gen_ai.usage.output_tokens`) as `avg_output_tokens` by `attributes.gen_ai.request.model`, `attributes.aws.local.service`,bin(1h)
-#     | DISPLAY avg_output_tokens, `attributes.gen_ai.request.model`, `attributes.aws.local.service`
-#     ```
+    ```
+    FILTER attributes.aws.local.service = "customers-service-java" and attributes.aws.local.environment = "eks:demo/default" and attributes.aws.remote.operation="InvokeModel"
+    | STATS sum(`attributes.gen_ai.usage.output_tokens`) as `avg_output_tokens` by `attributes.gen_ai.request.model`, `attributes.aws.local.service`,bin(1h)
+    | DISPLAY avg_output_tokens, `attributes.gen_ai.request.model`, `attributes.aws.local.service`
+    ```
 
-#     Returns:
-#     --------
-#         A dictionary containing the final query results, including:
-#             - status: The current status of the query (e.g., Scheduled, Running, Complete, Failed, etc.)
-#             - results: A list of the actual query results if the status is Complete.
-#             - statistics: Query performance statistics
-#             - messages: Any informational messages about the query
-#             - transaction_search_status: Information about transaction search availability
-#     """
-#     limit = int(limit) if limit else None
-#     max_timeout = int(max_timeout)
-#     start_time_perf = timer()
-#     logger.info(f"Starting search_transactions - log_group: {log_group_name}, start: {start_time}, end: {end_time}")
-#     logger.debug(f"Query string: {query_string}")
+    Returns:
+    --------
+        A dictionary containing the final query results, including:
+            - status: The current status of the query (e.g., Scheduled, Running, Complete, Failed, etc.)
+            - results: A list of the actual query results if the status is Complete.
+            - statistics: Query performance statistics
+            - messages: Any informational messages about the query
+            - transaction_search_status: Information about transaction search availability
+    """
+    limit = int(limit) if limit else None
+    max_timeout = int(max_timeout) if max_timeout else None
+    start_time_perf = timer()
+    logger.info(f"Starting search_transactions - log_group: {log_group_name}, start: {start_time}, end: {end_time}")
+    logger.debug(f"Query string: {query_string}")
 
-#     # Check if transaction search is enabled
-#     is_enabled, destination, status = check_transaction_search_enabled(AWS_REGION)
+    # Check if transaction search is enabled
+    is_enabled, destination, status = check_transaction_search_enabled(AWS_REGION)
 
-#     if not is_enabled:
-#         logger.warning(f"Transaction Search not enabled - Destination: {destination}, Status: {status}")
-#         return {
-#             "status": "Transaction Search Not Available",
-#             "transaction_search_status": {"enabled": False, "destination": destination, "status": status},
-#             "message": (
-#                 "⚠️ Transaction Search is not enabled for this account. "
-#                 f"Current configuration: Destination={destination}, Status={status}. "
-#                 "Transaction Search requires sending traces to CloudWatch Logs (destination='CloudWatchLogs' and status='ACTIVE'). "
-#                 "Without Transaction Search, you only have access to 5% sampled trace data through X-Ray. "
-#                 "To get 100% trace visibility, please enable Transaction Search in your X-Ray settings. "
-#                 "As a fallback, you can use query_sampled_traces() but results may be incomplete due to sampling."
-#             ),
-#             "fallback_recommendation": "Use query_sampled_traces() with X-Ray filter expressions for 5% sampled data.",
-#         }
+    if not is_enabled:
+        logger.warning(f"Transaction Search not enabled - Destination: {destination}, Status: {status}")
+        return {
+            "status": "Transaction Search Not Available",
+            "transaction_search_status": {"enabled": False, "destination": destination, "status": status},
+            "message": (
+                "⚠️ Transaction Search is not enabled for this account. "
+                f"Current configuration: Destination={destination}, Status={status}. "
+                "Transaction Search requires sending traces to CloudWatch Logs (destination='CloudWatchLogs' and status='ACTIVE'). "
+                "Without Transaction Search, you only have access to 5% sampled trace data through X-Ray. "
+                "To get 100% trace visibility, please enable Transaction Search in your X-Ray settings. "
+                "As a fallback, you can use query_sampled_traces() but results may be incomplete due to sampling."
+            ),
+            "fallback_recommendation": "Use query_sampled_traces() with X-Ray filter expressions for 5% sampled data.",
+        }
 
-#     try:
-#         # Use default log group if none provided
-#         if log_group_name == "" or log_group_name is None:
-#             log_group_name = "aws/spans"
-#             logger.debug("Using default log group: aws/spans")
-#         # Start query
+    try:
+        # Use default log group if none provided
+        if log_group_name == "" or log_group_name is None:
+            log_group_name = "aws/spans"
+            logger.debug("Using default log group: aws/spans")
+        # Start query
         
-#         kwargs = {
-#             "startTime": int(datetime.fromisoformat(start_time.replace('Z', '+00:00')).timestamp()),
-#             "endTime": int(datetime.fromisoformat(end_time.replace('Z', '+00:00')).timestamp()),
-#             "queryString": query_string,
-#             "logGroupNames": [log_group_name],
-#             "limit": limit,
-#         }
+        kwargs = {
+            "startTime": int(datetime.fromisoformat(start_time.replace('Z', '+00:00')).timestamp()),
+            "endTime": int(datetime.fromisoformat(end_time.replace('Z', '+00:00')).timestamp()),
+            "queryString": query_string,
+            "logGroupNames": [log_group_name],
+            "limit": limit,
+        }
 
-#         logger.debug(f"Starting CloudWatch Logs query with limit: {limit}")
-#         start_response = logs_client.start_query(**remove_null_values(kwargs))
-#         query_id = start_response["queryId"]
-#         logger.info(f"Started CloudWatch Logs query with ID: {query_id}")
+        logger.debug(f"Starting CloudWatch Logs query with limit: {limit}")
+        start_response = logs_client.start_query(**remove_null_values(kwargs))
+        query_id = start_response["queryId"]
+        logger.info(f"Started CloudWatch Logs query with ID: {query_id}")
 
-#         # Seconds
-#         poll_start = timer()
-#         while poll_start + max_timeout > timer():
-#             response = logs_client.get_query_results(queryId=query_id)
-#             status = response["status"]
+        # Seconds
+        poll_start = timer()
+        while poll_start + max_timeout > timer():
+            response = logs_client.get_query_results(queryId=query_id)
+            status = response["status"]
 
-#             if status in {"Complete", "Failed", "Cancelled"}:
-#                 elapsed_time = timer() - start_time_perf
-#                 logger.info(f"Query {query_id} finished with status {status} in {elapsed_time:.3f}s")
+            if status in {"Complete", "Failed", "Cancelled"}:
+                elapsed_time = timer() - start_time_perf
+                logger.info(f"Query {query_id} finished with status {status} in {elapsed_time:.3f}s")
 
-#                 if status == "Failed":
-#                     logger.error(f"Query failed: {response.get('statistics', {})}")
-#                 elif status == "Complete":
-#                     logger.debug(f"Query returned {len(response.get('results', []))} results")
+                if status == "Failed":
+                    logger.error(f"Query failed: {response.get('statistics', {})}")
+                elif status == "Complete":
+                    logger.debug(f"Query returned {len(response.get('results', []))} results")
 
-#                 return {
-#                     "queryId": query_id,
-#                     "status": status,
-#                     "statistics": response.get("statistics", {}),
-#                     "results": [
-#                         {field["field"]: field["value"] for field in line} for line in response.get("results", [])
-#                     ],
-#                     "transaction_search_status": {
-#                         "enabled": True,
-#                         "destination": "CloudWatchLogs",
-#                         "status": "ACTIVE",
-#                         "message": "✅ Using 100% sampled trace data from Transaction Search",
-#                     },
-#                 }
+                return {
+                    "queryId": query_id,
+                    "status": status,
+                    "statistics": response.get("statistics", {}),
+                    "results": [
+                        {field["field"]: field["value"] for field in line} for line in response.get("results", [])
+                    ],
+                    "transaction_search_status": {
+                        "enabled": True,
+                        "destination": "CloudWatchLogs",
+                        "status": "ACTIVE",
+                        "message": "✅ Using 100% sampled trace data from Transaction Search",
+                    },
+                }
 
-#             await asyncio.sleep(1)
+            await asyncio.sleep(1)
 
-#         elapsed_time = timer() - start_time_perf
-#         msg = f"Query {query_id} did not complete within {max_timeout} seconds. Use get_query_results with the returned queryId to try again to retrieve query results."
-#         logger.warning(f"Query timeout after {elapsed_time:.3f}s: {msg}")
-#         return {
-#             "queryId": query_id,
-#             "status": "Polling Timeout",
-#             "message": msg,
-#         }
+        elapsed_time = timer() - start_time_perf
+        msg = f"Query {query_id} did not complete within {max_timeout} seconds. Use get_query_results with the returned queryId to try again to retrieve query results."
+        logger.warning(f"Query timeout after {elapsed_time:.3f}s: {msg}")
+        return {
+            "queryId": query_id,
+            "status": "Polling Timeout",
+            "message": msg,
+        }
 
-#     except Exception as e:
-#         logger.error(f"Error in search_transactions: {str(e)}", exc_info=True)
-#         raise
+    except Exception as e:
+        logger.error(f"Error in search_transactions: {str(e)}", exc_info=True)
+        raise
 
 
 @mcp.tool()
